@@ -1,4 +1,6 @@
 // src/systems/GameState.js
+import { Fairy } from '../entities/Fairy.js';
+
 export const GameState = {
     unicorns: [],
     fairies: [new Fairy('starter', true)],
