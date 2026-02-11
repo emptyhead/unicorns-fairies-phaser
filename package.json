@@ -2,14 +2,18 @@
   "name": "unicorns-and-fairies",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start": "npx serve .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
   "dependencies": {
     "phaser": "^3.90.0"
   }
