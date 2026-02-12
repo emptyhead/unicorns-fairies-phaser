@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { Unicorn } from '../entities/Unicorn.js';
 import { Fairy } from '../entities/Fairy.js';
-import { generateAllPlaceholders, generateStatBarTexture } from '../utils/PlaceholderGraphics.js';
+import { generateAllPlaceholders } from '../utils/PlaceholderGraphics.js';
 
 /**
  * EnclosureScene - Main gameplay scene for unicorn care
@@ -49,6 +49,20 @@ class EnclosureScene extends Phaser.Scene {
         // Display stat bars
         this.createStatBars(width / 2 - 150, 50);
 
+        // Display growth progress
+        this.growthText = this.add.text(width / 2, height / 2 + 110, 
+            `Growth: ${Math.round(this.testUnicorn.growthProgress)}/${Unicorn.STAGE_THRESHOLDS['Teen']}`, {
+            fontSize: '14px',
+            fill: '#aaaaaa'
+        }).setOrigin(0.5);
+
+        // Display stage
+        this.stageText = this.add.text(width / 2, height / 2 + 130, 
+            `Stage: ${this.testUnicorn.stage}`, {
+            fontSize: '16px',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+
         // Scene title
         this.add.text(width / 2, 20, 'Enclosure Scene', {
             fontSize: '32px',
@@ -56,7 +70,7 @@ class EnclosureScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Instructions
-        this.add.text(width / 2, height - 30, 'Placeholder graphics - click to interact', {
+        this.add.text(width / 2, height - 30, 'Click unicorn to interact - watch stats decay!', {
             fontSize: '16px',
             fill: '#aaaaaa'
         }).setOrigin(0.5);
@@ -69,7 +83,7 @@ class EnclosureScene extends Phaser.Scene {
     }
 
     /**
-     * Create stat bars display
+     * Create stat bars display with critical state warnings
      * @param {number} x - Starting X position
      * @param {number} y - Starting Y position
      */
@@ -81,14 +95,17 @@ class EnclosureScene extends Phaser.Scene {
             play: 0x4caf50,
             sleep: 0x9c27b0
         };
+        const warningColor = 0xff0000; // Red when critical (>= 80)
+        const criticalThreshold = 80;
 
         stats.forEach((stat, index) => {
             const yPos = y + (index * 30);
+            const isCritical = this.testUnicorn.stats[stat] >= criticalThreshold;
             
             // Label
             this.add.text(x, yPos, stat.charAt(0).toUpperCase() + stat.slice(1), {
                 fontSize: '16px',
-                fill: '#ffffff'
+                fill: isCritical ? '#ff6666' : '#ffffff'
             });
 
             // Background bar
@@ -96,11 +113,17 @@ class EnclosureScene extends Phaser.Scene {
             
             // Fill bar (will be updated based on stat value)
             const fillWidth = Math.max(1, 100 - this.testUnicorn.stats[stat]);
-            const fillBar = this.add.rectangle(x + 131, yPos + 9, fillWidth, 14, colors[stat]).setOrigin(0, 0);
+            const fillBar = this.add.rectangle(
+                x + 131, yPos + 9, fillWidth, 14, 
+                isCritical ? warningColor : colors[stat]
+            ).setOrigin(0, 0);
             
             // Store reference for updates
             if (!this.statBars) this.statBars = {};
-            this.statBars[stat] = fillBar;
+            this.statBars[stat] = {
+                bar: fillBar,
+                labelColor: isCritical
+            };
         });
     }
 
@@ -108,11 +131,11 @@ class EnclosureScene extends Phaser.Scene {
      * Handle clicking on the unicorn
      */
     handleUnicornClick() {
-        // Simple interaction: increase love stat
-        this.testUnicorn.stats.love = Math.max(0, this.testUnicorn.stats.love - 10);
+        // Reduce love stat (care action)
+        this.testUnicorn.reduceStat('love', 15);
         this.updateStatBars();
         
-        // Visual feedback
+        // Visual feedback - scale tween
         this.tweens.add({
             targets: this.testUnicorn.sprite,
             scaleX: 1.2,
@@ -123,21 +146,161 @@ class EnclosureScene extends Phaser.Scene {
     }
 
     /**
-     * Update stat bar visuals
+     * Update stat bar visuals including critical state colors
      */
     updateStatBars() {
         const stats = ['food', 'love', 'play', 'sleep'];
+        const warningColor = 0xff0000;
+        const criticalThreshold = 80;
+        const colors = {
+            food: 0xff9800,
+            love: 0xe91e63,
+            play: 0x4caf50,
+            sleep: 0x9c27b0
+        };
+
         stats.forEach(stat => {
             if (this.statBars && this.statBars[stat]) {
                 const fillWidth = Math.max(1, 100 - this.testUnicorn.stats[stat]);
-                this.statBars[stat].width = fillWidth;
+                this.statBars[stat].bar.width = fillWidth;
+                
+                // Update color based on critical state
+                const isCritical = this.testUnicorn.stats[stat] >= criticalThreshold;
+                this.statBars[stat].bar.fillColor = isCritical ? warningColor : colors[stat];
             }
         });
     }
 
+    /**
+     * Update unicorn visual state based on mood
+     */
+    updateUnicornVisuals() {
+        if (!this.testUnicorn.sprite) return;
+        
+        const unicorn = this.testUnicorn;
+        
+        // Remove existing tweens on sprite
+        this.tweens.killTweensOf(unicorn.sprite);
+        
+        if (unicorn.isUnhappy) {
+            // UNHAPPY: Crying effect
+            if (!unicorn.cryingEffect) {
+                // Create tear particles
+                unicorn.cryingEffect = this.add.particles(0, 0, 'tear', {
+                    x: unicorn.sprite.x,
+                    y: unicorn.sprite.y - 20,
+                    lifespan: 800,
+                    speedY: { min: -30, max: -60 },
+                    speedX: { min: -10, max: 10 },
+                    scale: { start: 0.4, end: 0 },
+                    frequency: 150,
+                    emitting: true
+                });
+            }
+            
+            // Sad pulsing animation
+            this.tweens.add({
+                targets: unicorn.sprite,
+                alpha: 0.6,
+                duration: 600,
+                yoyo: true,
+                repeat: -1
+            });
+            
+            // Shake effect
+            this.tweens.add({
+                targets: unicorn.sprite,
+                x: unicorn.sprite.x - 2,
+                duration: 50,
+                yoyo: true,
+                repeat: -1
+            });
+            
+            // Update unhappy indicator
+            if (!unicorn.unhappyText) {
+                unicorn.unhappyText = this.add.text(
+                    unicorn.sprite.x, 
+                    unicorn.sprite.y - 50, 
+                    'Unhappy!', 
+                    { fontSize: '14px', fill: '#ff6666' }
+                ).setOrigin(0.5);
+            }
+        } else {
+            // HAPPY: Remove crying effect
+            if (unicorn.cryingEffect) {
+                unicorn.cryingEffect.destroy();
+                unicorn.cryingEffect = null;
+            }
+            
+            // Remove unhappy text
+            if (unicorn.unhappyText) {
+                unicorn.unhappyText.destroy();
+                unicorn.unhappyText = null;
+            }
+            
+            // Happy bounce animation
+            this.tweens.add({
+                targets: unicorn.sprite,
+                y: unicorn.sprite.y - 5,
+                duration: 400,
+                yoyo: true,
+                repeat: -1
+            });
+        }
+    }
+
+    /**
+     * Show stage transition message
+     */
+    showStageTransitionMessage(newStage) {
+        const message = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2 - 100,
+            `${this.testUnicorn.name} evolved to ${newStage}!`,
+            {
+                fontSize: '28px',
+                fill: '#FFD700',
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: message,
+            y: message.y - 50,
+            alpha: 0,
+            duration: 2500,
+            onComplete: () => message.destroy()
+        });
+    }
+
     update(time, delta) {
-        // TODO: Update unicorn stats (decay over time)
-        // TODO: Check growth XP accumulation
+        // Update unicorn stats (decay over time)
+        if (this.testUnicorn) {
+            this.testUnicorn.update(delta);
+            this.updateStatBars();
+            this.updateUnicornVisuals();
+            
+            // Update growth text
+            const nextThreshold = Unicorn.STAGE_THRESHOLDS[
+                this.testUnicorn.stage === 'Young' ? 'Teen' : 
+                this.testUnicorn.stage === 'Teen' ? 'Adult' : 'Adult'
+            ];
+            this.growthText.setText(
+                `Growth: ${Math.round(this.testUnicorn.growthProgress)}/${nextThreshold}`
+            );
+            
+            // Update stage text
+            this.stageText.setText(`Stage: ${this.testUnicorn.stage}`);
+            
+            // Check for stage transition
+            if (this.testUnicorn.stageChanged) {
+                this.testUnicorn.updateSpriteTexture(this);
+                this.showStageTransitionMessage(this.testUnicorn.stage);
+                this.testUnicorn.stageChanged = false;
+            }
+        }
+        
         // TODO: Handle fairy cooldowns
     }
 }

@@ -129,6 +129,33 @@ export function generateFairyTexture(scene, isMain = false) {
 }
 
 /**
+ * Generate a tear particle texture for crying unicorns
+ * @param {Phaser.Scene} scene - The scene to generate the texture in
+ * @returns {string} The texture key
+ */
+export function generateTearTexture(scene) {
+    const key = 'tear';
+    
+    // Don't regenerate if texture exists
+    if (scene.textures.exists(key)) {
+        return key;
+    }
+
+    const graphics = scene.add.graphics();
+    const size = 12;
+    
+    // Draw tear drop shape
+    graphics.fillStyle(0x87CEEB, 1);
+    graphics.fillCircle(size / 2, size / 2, size / 3);
+    
+    // Generate texture
+    graphics.generateTexture(key, size, size);
+    graphics.destroy();
+    
+    return key;
+}
+
+/**
  * Generate a stat bar texture
  * @param {Phaser.Scene} scene - The scene to generate the texture in
  * @param {number} width - Width of the bar
@@ -179,6 +206,9 @@ export function generateAllPlaceholders(scene) {
     // Generate fairy textures
     generateFairyTexture(scene, true);
     generateFairyTexture(scene, false);
+    
+    // Generate tear particle texture
+    generateTearTexture(scene);
     
     // Generate stat bar
     generateStatBarTexture(scene);
