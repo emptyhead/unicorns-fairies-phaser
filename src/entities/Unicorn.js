@@ -44,7 +44,7 @@ export class Unicorn {
         
         // Stat bar references (set when created)
         this.statBars = null;
-        this.statBarOffset = 40; // Distance above sprite
+        this.statBarOffset = 25; // Distance above sprite (positions bottom bar 5px above sprite)
     }
 
     getEXP() {
