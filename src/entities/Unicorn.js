@@ -41,6 +41,10 @@ export class Unicorn {
         
         // Phaser sprite reference (set when added to scene)
         this.sprite = null;
+        
+        // Stat bar references (set when created)
+        this.statBars = null;
+        this.statBarOffset = 40; // Distance above sprite
     }
 
     getEXP() {
@@ -129,6 +133,114 @@ export class Unicorn {
     reduceStat(statName, amount) {
         if (this.stats.hasOwnProperty(statName)) {
             this.stats[statName] = Math.max(0, this.stats[statName] - amount);
+        }
+    }
+
+    /**
+     * Create stat bars for this unicorn
+     * @param {Phaser.Scene} scene - The scene to add bars to
+     * @param {number} x - X position (unicorn center)
+     * @param {number} y - Y position (unicorn center)
+     */
+    createStatBars(scene, x, y) {
+        if (this.statBars) return; // Already created
+        
+        this.statBars = {
+            container: scene.add.container(0, 0),
+            bars: {},
+            labels: {}
+        };
+        
+        const stats = ['food', 'love', 'play', 'sleep'];
+        const colors = {
+            food: 0xff9800,
+            love: 0xe91e63,
+            play: 0x4caf50,
+            sleep: 0x9c27b0
+        };
+        const warningColor = 0xff0000;
+        const criticalThreshold = 80;
+        
+        stats.forEach((stat, index) => {
+            const yPos = index * 16; // Reduced spacing
+            const isCritical = this.stats[stat] >= criticalThreshold;
+            
+            // Label on left side (right-aligned)
+            const label = scene.add.text(-45, yPos + 1, stat.charAt(0).toUpperCase() + stat.slice(1), {
+                fontSize: '10px', // Smaller font
+                fill: isCritical ? '#ff6666' : '#ffffff'
+            }).setOrigin(1, 0.5);
+            
+            // Background bar (80px wide, 3px tall) - centered
+            const bgBar = scene.add.rectangle(0, yPos + 1, 80, 3, 0x333333).setOrigin(0, 0);
+            
+            // Fill bar
+            const fillWidth = Math.max(1, (80 / 100) * (100 - this.stats[stat])); // Scale to 80px max
+            const fillBar = scene.add.rectangle(
+                0, yPos + 1, fillWidth, 3, 
+                isCritical ? warningColor : colors[stat]
+            ).setOrigin(0, 0);
+            
+            this.statBars.labels[stat] = label;
+            this.statBars.bars[stat] = {
+                fill: fillBar,
+                bg: bgBar,
+                color: colors[stat]
+            };
+            
+            this.statBars.container.add([bgBar, fillBar, label]);
+        });
+        
+        this.statBars.container.setDepth(100);
+        this.updateStatBarsPosition(x, y);
+        this.statBars.container.setVisible(true);
+    }
+
+    /**
+     * Update stat bar visuals (widths and colors)
+     */
+    updateStatBars() {
+        if (!this.statBars) return;
+        
+        const warningColor = 0xff0000;
+        const criticalThreshold = 80;
+        
+        ['food', 'love', 'play', 'sleep'].forEach(stat => {
+            if (this.statBars.bars[stat]) {
+                const fillWidth = Math.max(1, (80 / 100) * (100 - this.stats[stat]));
+                this.statBars.bars[stat].fill.width = fillWidth;
+                
+                const isCritical = this.stats[stat] >= criticalThreshold;
+                this.statBars.bars[stat].fill.fillColor = isCritical ? warningColor : this.statBars.bars[stat].color;
+                
+                // Update label color
+                this.statBars.labels[stat].setStyle({
+                    fill: isCritical ? '#ff6666' : '#ffffff'
+                });
+            }
+        });
+    }
+
+    /**
+     * Update stat bar position to follow the unicorn
+     * @param {number} x - Current X position of unicorn
+     * @param {number} y - Current Y position of unicorn
+     */
+    updateStatBarsPosition(x, y) {
+        if (this.statBars && this.statBars.container) {
+            this.statBars.container.setPosition(x, y - this.statBarOffset);
+        }
+    }
+
+    /**
+     * Destroy stat bars (cleanup)
+     */
+    destroyStatBars() {
+        if (this.statBars) {
+            if (this.statBars.container) {
+                this.statBars.container.destroy();
+            }
+            this.statBars = null;
         }
     }
 }

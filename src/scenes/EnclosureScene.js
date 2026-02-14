@@ -46,8 +46,8 @@ class EnclosureScene extends Phaser.Scene {
             fill: '#ffffff'
         }).setOrigin(0.5);
 
-        // Display stat bars
-        this.createStatBars(width / 2 - 150, 50);
+        // Create stat bars for the unicorn (positioned above it)
+        this.testUnicorn.createStatBars(this, width / 2, height / 2);
 
         // Display growth progress
         this.growthText = this.add.text(width / 2, height / 2 + 110, 
@@ -83,57 +83,12 @@ class EnclosureScene extends Phaser.Scene {
     }
 
     /**
-     * Create stat bars display with critical state warnings
-     * @param {number} x - Starting X position
-     * @param {number} y - Starting Y position
-     */
-    createStatBars(x, y) {
-        const stats = ['food', 'love', 'play', 'sleep'];
-        const colors = {
-            food: 0xff9800,
-            love: 0xe91e63,
-            play: 0x4caf50,
-            sleep: 0x9c27b0
-        };
-        const warningColor = 0xff0000; // Red when critical (>= 80)
-        const criticalThreshold = 80;
-
-        stats.forEach((stat, index) => {
-            const yPos = y + (index * 30);
-            const isCritical = this.testUnicorn.stats[stat] >= criticalThreshold;
-            
-            // Label
-            this.add.text(x, yPos, stat.charAt(0).toUpperCase() + stat.slice(1), {
-                fontSize: '16px',
-                fill: isCritical ? '#ff6666' : '#ffffff'
-            });
-
-            // Background bar
-            this.add.rectangle(x + 130, yPos + 8, 100, 16, 0x333333).setOrigin(0, 0);
-            
-            // Fill bar (will be updated based on stat value)
-            const fillWidth = Math.max(1, 100 - this.testUnicorn.stats[stat]);
-            const fillBar = this.add.rectangle(
-                x + 131, yPos + 9, fillWidth, 14, 
-                isCritical ? warningColor : colors[stat]
-            ).setOrigin(0, 0);
-            
-            // Store reference for updates
-            if (!this.statBars) this.statBars = {};
-            this.statBars[stat] = {
-                bar: fillBar,
-                labelColor: isCritical
-            };
-        });
-    }
-
-    /**
      * Handle clicking on the unicorn
      */
     handleUnicornClick() {
         // Reduce love stat (care action)
         this.testUnicorn.reduceStat('love', 15);
-        this.updateStatBars();
+        this.testUnicorn.updateStatBars();
         
         // Visual feedback - scale tween
         this.tweens.add({
@@ -142,32 +97,6 @@ class EnclosureScene extends Phaser.Scene {
             scaleY: 1.2,
             duration: 100,
             yoyo: true
-        });
-    }
-
-    /**
-     * Update stat bar visuals including critical state colors
-     */
-    updateStatBars() {
-        const stats = ['food', 'love', 'play', 'sleep'];
-        const warningColor = 0xff0000;
-        const criticalThreshold = 80;
-        const colors = {
-            food: 0xff9800,
-            love: 0xe91e63,
-            play: 0x4caf50,
-            sleep: 0x9c27b0
-        };
-
-        stats.forEach(stat => {
-            if (this.statBars && this.statBars[stat]) {
-                const fillWidth = Math.max(1, 100 - this.testUnicorn.stats[stat]);
-                this.statBars[stat].bar.width = fillWidth;
-                
-                // Update color based on critical state
-                const isCritical = this.testUnicorn.stats[stat] >= criticalThreshold;
-                this.statBars[stat].bar.fillColor = isCritical ? warningColor : colors[stat];
-            }
         });
     }
 
@@ -278,8 +207,16 @@ class EnclosureScene extends Phaser.Scene {
         // Update unicorn stats (decay over time)
         if (this.testUnicorn) {
             this.testUnicorn.update(delta);
-            this.updateStatBars();
+            this.testUnicorn.updateStatBars();
             this.updateUnicornVisuals();
+            
+            // Update stat bars position to follow unicorn
+            if (this.testUnicorn.sprite) {
+                this.testUnicorn.updateStatBarsPosition(
+                    this.testUnicorn.sprite.x, 
+                    this.testUnicorn.sprite.y
+                );
+            }
             
             // Update growth text
             const nextThreshold = Unicorn.STAGE_THRESHOLDS[
