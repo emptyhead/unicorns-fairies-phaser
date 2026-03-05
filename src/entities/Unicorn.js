@@ -162,7 +162,7 @@ export class Unicorn {
         const criticalThreshold = 80;
         
         stats.forEach((stat, index) => {
-            const yPos = index * 16; // Reduced spacing
+            const yPos = index * 6; // Reduced spacing
             const isCritical = this.stats[stat] >= criticalThreshold;
             
             // Label on left side (right-aligned)
